@@ -24,17 +24,22 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 // Enqueue function: adds a new line to the queue
-void enqueue(Queue *q, const char *line) {
+void enqueue(Queue *q, const char *line) 
+{
     Node *new_node = (Node *)malloc(sizeof(Node));
-    new_node->line = strdup(line); // Copy the input line
+    new_node->line = strdup(line); // Copy the input line //动态分配内存来存储新复制的字符串，并将其返回 
+                                                            //自动为目标字符串分配所需的内存，不必手动计算长度和分配空间
     new_node->next = NULL;
 
     pthread_mutex_lock(&mutex);
 
     // If the queue is empty, head and tail both point to the new node
-    if (q->tail == NULL) {
+    if (q->tail == NULL) 
+    {
         q->head = q->tail = new_node;
-    } else {
+    } 
+    else 
+    {
         q->tail->next = new_node;
         q->tail = new_node;
     }
@@ -45,11 +50,13 @@ void enqueue(Queue *q, const char *line) {
 }
 
 // Dequeue function: removes and returns the oldest line in the queue
-char* dequeue(Queue *q) {
+char* dequeue(Queue *q) 
+{
     pthread_mutex_lock(&mutex);
 
     // Wait if the queue is empty
-    while (q->head == NULL) {
+    while (q->head == NULL) 
+    {
         pthread_cond_wait(&cond, &mutex);
     }
 
@@ -58,7 +65,8 @@ char* dequeue(Queue *q) {
     q->head = q->head->next;          // Move the head pointer
 
     // If the queue is now empty, reset the tail pointer
-    if (q->head == NULL) {
+    if (q->head == NULL) 
+    {
         q->tail = NULL;
     }
 
@@ -70,21 +78,21 @@ char* dequeue(Queue *q) {
 }
 
 // Consumer thread function
-void* consumer_function(void* arg) {
-    while (1) {
+void* consumer_function(void* arg) 
+{
+    while (1) 
+    {
         // Dequeue and print the line
         char *line = dequeue(&queue);
         printf("Consumed: %s", line);
         free(line);  // Free the dequeued line
-
-        // Sleep for a short time to simulate work
-        usleep(100000); // 100ms
     }
 
     pthread_exit(NULL);
 }
 
-int main() {
+int main(int argc, char** argv) 
+{
     pthread_t consumer_thread;
 
     // Start the consumer thread
