@@ -5,20 +5,20 @@
 #include <stdatomic.h>
 #include <time.h>
 
-#define LARGE_CHUNK_SIZE (64 * 1024 * 1024) 
+#define LARGE_CHUNK_SIZE (64 * 1024 * 1024)  
 
 struct chunk {
     size_t size;  
     union {
         struct chunk* next;  
-        char content[0];     
+        char content[0];    
     };
 };
 
 // Atomic pointer to the free chunk list head
 _Atomic(struct chunk*) free_list = NULL;
 
-// Function to pop a chunk from the free list (lock-free, atomic operation)
+// Function to pop a chunk from the free list (lock-free, using CAS)
 struct chunk* pop() 
 {
     struct chunk* head;
@@ -30,12 +30,12 @@ struct chunk* pop()
             return NULL;  // If the free list is empty, return NULL
         }
     } while (!atomic_compare_exchange_weak(&free_list, &head, head->next));  
-    // Try to swap the head with its next chunk. If another thread modifies it, retry.
+    // CAS operation: Try to swap the head with its next chunk. If another thread modifies it, retry.
 
     return head;  // Return the popped chunk
 }
 
-// Function to push a chunk (or a list of chunks) onto the free list (lock-free, atomic operation)
+// Function to push a chunk (or a list of chunks) onto the free list (lock-free, using CAS)
 void push(struct chunk* head, struct chunk* tail) 
 {
     struct chunk* old_head;
@@ -43,25 +43,24 @@ void push(struct chunk* head, struct chunk* tail)
         old_head = atomic_load(&free_list);  // Load the current head of the free list atomically
         tail->next = old_head;  // Point the tail of the list to the current head
     } while (!atomic_compare_exchange_weak(&free_list, &old_head, head));
-    // Atomically update the head of the free list to the new head (the chunk or list being pushed)
+    // CAS operation: Atomically update the head of the free list to the new head (the chunk or list being pushed)
 }
 
 // Function to free (release) a chunk and push it onto the free list
 void free_chunk(struct chunk* c) 
 {
-    push(c, c);  // Push the chunk back onto the free list
+    push(c, c);  
 }
 
-// Function to create a large chunk of memory
 struct chunk* create_large_chunk() 
 {
-    struct chunk* large_chunk = (struct chunk*)malloc(LARGE_CHUNK_SIZE);  // Allocate a large chunk of memory
+    struct chunk* large_chunk = (struct chunk*)malloc(LARGE_CHUNK_SIZE);  
     if (!large_chunk) 
     {
-        return NULL;  // Return NULL if allocation failed
+        return NULL;  
     }
 
-    large_chunk->size = LARGE_CHUNK_SIZE - sizeof(struct chunk);  // Set the usable size of the chunk (subtract metadata)
+    large_chunk->size = LARGE_CHUNK_SIZE - sizeof(struct chunk);  
     return large_chunk;
 }
 
@@ -78,7 +77,7 @@ struct chunk* alloc_chunk(size_t size)
             if (c->size > size + sizeof(struct chunk)) 
             {
                 struct chunk* new_chunk = (struct chunk*)((uintptr_t)c + sizeof(struct chunk) + size);
-                new_chunk->size = c->size - size - sizeof(struct chunk);  // Size of the remaining part
+                new_chunk->size = c->size - size - sizeof(struct chunk);  
                 c->size = size;  // Shrink the current chunk to the requested size
 
                 free_chunk(new_chunk);  // Return the remaining part to the free list
@@ -99,7 +98,6 @@ struct chunk* alloc_chunk(size_t size)
     return alloc_chunk(size);  // Retry the allocation after adding the large chunk
 }
 
-// Function to calculate the time difference in milliseconds between two timespec structs
 double timer(struct timespec start, struct timespec end) 
 {
     return (end.tv_sec - start.tv_sec) * 1e3 + (end.tv_nsec - start.tv_nsec) / 1e6;
@@ -118,8 +116,9 @@ int main(int argc, char** argv)
         }
     }
 
+    // Record the start time before calling alloc_chunk
     struct timespec start_time, end_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);  // Use CLOCK_MONOTONIC to avoid system time changes
+    clock_gettime(CLOCK_MONOTONIC, &start_time);  
     struct chunk* c = alloc_chunk(size);    // Allocate the chunk
     clock_gettime(CLOCK_MONOTONIC, &end_time);  // Record the end time
 
@@ -128,12 +127,12 @@ int main(int argc, char** argv)
     
     if (c) 
     {
-        printf("Allocated a chunk of size %zu\n", c->size);  
+        printf("Allocated a chunk of size %zu\n", c->size);  // Print the size of the allocated chunk
     }
     else 
     {
         printf("Failed to allocate a chunk of size %zu\n", size);  // Print an error message if allocation failed
     }
 
-    return 0;  
+    return 0; 
 }
