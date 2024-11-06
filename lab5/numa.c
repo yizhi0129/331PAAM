@@ -1,7 +1,10 @@
+#define _POSIX_C_SOURCE 199309L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <hwloc.h>
+#include </usr/include/hwloc.h>
+#include <sys/time.h>
 #include <time.h>
 #include <assert.h>
 #include <string.h>
@@ -65,17 +68,31 @@ void *test_thread(void *arg)
     return NULL;
 }
 
+int num_nodes;  // Global variable to store the number of NUMA nodes
+
 // Initialize the hwloc topology
 void init_topology() 
 {
     hwloc_topology_init(&topology);
     hwloc_topology_load(topology);
+    num_nodes = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_NODE);
+    printf("System has %d NUMA nodes.\n", num_nodes);
 }
 
 // Allocate memory on a specific NUMA node
 void *allocate_numa_memory(size_t size, int node) 
 {
+    if (node >= num_nodes) 
+    {
+        fprintf(stderr, "Error: NUMA node %d does not exist. System only has %d NUMA nodes.\n", node, num_nodes);
+        return NULL;
+    }
     hwloc_obj_t obj = hwloc_get_obj_by_depth(topology, hwloc_get_type_depth(topology, HWLOC_OBJ_NODE), node);
+    if (!obj) 
+    {
+        fprintf(stderr, "Error: Failed to retrieve NUMA node %d.\n", node);
+        return NULL;
+    }
     return hwloc_alloc_membind(topology, size, obj->nodeset, HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_STRICT);
 }
 

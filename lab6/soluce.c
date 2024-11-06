@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 199309L
+
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
